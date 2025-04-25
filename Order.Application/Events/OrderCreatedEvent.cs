@@ -7,15 +7,13 @@ namespace Order.Application.Events
         public OrderPayload Payload { get; set; }
 
         public OrderCreatedEvent() : base(eventType: "OrderCreated", source: "order-service") { }
-        public OrderCreatedEvent(Guid orderId, string description, decimal price, int quantity, Guid customerId)
+        public OrderCreatedEvent(Guid orderId, decimal total, Guid customerId)
             : base(eventType: "OrderCreated", source: "order-service")
         {
             Payload = new OrderPayload
             {
                 OrderId = orderId,
-                Description = description,
-                Price = price,
-                Quantity = quantity,
+                Total = total,
                 CustomerId = customerId
             };
         }
@@ -24,9 +22,7 @@ namespace Order.Application.Events
     public class OrderPayload
     {
         public Guid OrderId { get; set; }
-        public string Description { get; set; }
-        public decimal Price { get; set; }
-        public int Quantity { get; set; }
+        public decimal Total { get; set; }
         public Guid CustomerId { get; set; }
     }
 

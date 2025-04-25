@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using MediatR;
+using Microsoft.AspNetCore.Mvc;
+using Order.Application.Commands;
 using Order.Application.DTO.Order;
-using Order.Application.Interfaces;
 using SharedLib;
 namespace OrderService.Controllers
 {
@@ -8,16 +9,23 @@ namespace OrderService.Controllers
     [ApiController]
     public class OrderController : ControllerBase
     {
-        private readonly IOrderService _orderService;
+        private readonly IMediator mediator;
 
-        public OrderController(IOrderService orderService)
+        public OrderController(IMediator mediator)
         {
-            _orderService = orderService;
+            this.mediator = mediator;
         }
+
         [HttpPost]
         public async Task<Result<Guid>> CreateOrderAsync([FromBody] CreateOrderDto dto)
         {
-            var orderId = await _orderService.CreateOrderAsync(dto);
+            CreateOrderCommand cmd = new CreateOrderCommand()
+            {
+                Id = Guid.NewGuid(),
+                Total = dto.Total,
+                CustomerId = dto.CustomerId
+            };
+            var orderId = await mediator.Send(cmd);
             return Result<Guid>.Success("Order created!", orderId);
         }
     }

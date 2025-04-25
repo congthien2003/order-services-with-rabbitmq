@@ -1,6 +1,6 @@
 ﻿using Order.Domain.Abstractions;
 
-namespace Order.Infrastructure.MessageBroker
+namespace Order.Application
 {
     public interface IRabbitMQService
     {

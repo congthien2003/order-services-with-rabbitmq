@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Order.Application;
 using Order.Domain.Abstractions;
 using RabbitMQ.Client;
 using System.Text;

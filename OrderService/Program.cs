@@ -1,10 +1,14 @@
-using Order.Application.CreateOrder;
-using Order.Application.Interfaces;
-using Order.Domain.Repository;
+using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using Order.Application;
+using Order.Application.Commands;
+using Order.Application.Commands.Repositories;
+using Order.Application.Queries;
+using Order.Infrastructure;
+using Order.Infrastructure.DataContext;
 using Order.Infrastructure.MessageBroker;
 using Order.Infrastructure.Repository;
 using Order.Worker;
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -14,13 +18,45 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddScoped<IOrderService, Order.Application.Services.OrderService>();
 builder.Services.AddScoped<IRabbitMQService, RabbitMQService>();
 
+builder.Services.AddScoped<IOrderCommandRepository, OrderCommandRepository>();
+builder.Services.AddScoped<IOrderQueryRepository, OrderQueryRepository>();
+
+builder.Services.AddDbContext<CommandDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("CommandConnection")));
+
+builder.Services.AddDbContext<QueryDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("QueryConnection")));
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(CreateOrderCommand).Assembly));
-builder.Services.AddScoped<IOrderRepository<Order.Domain.Models.Order>, OrderRepository>();
 builder.Services.AddHostedService<Worker>();
+
+builder.Services.AddMassTransit(busConfigurator =>
+{
+    busConfigurator.SetKebabCaseEndpointNameFormatter();
+
+    busConfigurator.AddConsumer<OrderCreatedConsumer>();
+
+    busConfigurator.UsingRabbitMq((context, config) =>
+    {
+
+        config.Host("localhost", "/", h =>
+        {
+            h.Username("guest");
+            h.Password("guest");
+        });
+        config.ConfigureEndpoints(context);
+
+        config.ReceiveEndpoint("order", e =>
+        {
+            e.ConfigureConsumer<OrderCreatedConsumer>(context);
+        });
+
+
+    });
+
+});
 
 var app = builder.Build();
 

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Order.Application.Events;
 using RabbitMQ.Client;
@@ -11,25 +12,27 @@ namespace Order.Worker
     {
         private readonly ConnectionFactory factory;
         private readonly ILogger<Worker> _logger;
-        public Worker(ILogger<Worker> logger)
+        private readonly IServiceScopeFactory _serviceScopeFactory;
+        public Worker(ILogger<Worker> logger, IServiceScopeFactory serviceScopeFactory)
         {
             factory = new ConnectionFactory { HostName = "localhost" };
             _logger = logger;
+            _serviceScopeFactory = serviceScopeFactory;
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             using var connection = await factory.CreateConnectionAsync();
             using var channel = await connection.CreateChannelAsync();
 
-            while (!stoppingToken.IsCancellationRequested)
+            while (stoppingToken.IsCancellationRequested)
             {
                 _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
 
-                await channel.QueueDeclareAsync(queue: "order", durable: false, exclusive: false, autoDelete: false,
-            arguments: null);
+                //    await channel.QueueDeclareAsync(queue: "order", durable: false, exclusive: false, autoDelete: false,
+                //arguments: null);
 
                 var consumer = new AsyncEventingBasicConsumer(channel);
-                consumer.ReceivedAsync += (model, ea) =>
+                consumer.ReceivedAsync += async (model, ea) =>
                 {
                     var body = ea.Body.ToArray();
                     var messageJson = Encoding.UTF8.GetString(body);
@@ -39,16 +42,29 @@ namespace Order.Worker
                     if (orderEvent == null)
                     {
                         _logger.LogError("Failed to parse OrderCreatedEvent");
-                        return Task.CompletedTask;
                     }
 
                     _logger.LogInformation($" [✔] Received OrderCreatedEvent: {orderEvent.Payload.OrderId}");
 
 
-                    return Task.CompletedTask;
+                    // Add to db
+                    //using (var scope = _serviceScopeFactory.CreateScope())
+                    //{
+                    //    var db = scope.ServiceProvider.GetService<QueryDbContext>();
+
+                    //    db.Orders.Add(new Domain.Models.Order
+                    //    {
+                    //        Id = orderEvent.Payload.OrderId,
+                    //        CustomerId = orderEvent.Payload.CustomerId,
+                    //        Total = orderEvent.Payload.Total,
+                    //        CreatedDate = DateTime.UtcNow,
+                    //        UpdatedDate = DateTime.UtcNow,
+                    //    });
+                    //    await db.SaveChangesAsync();
+                    //}
                 };
 
-                await channel.BasicConsumeAsync("order", autoAck: true, consumer: consumer);
+                //await channel.BasicConsumeAsync("order", autoAck: true, consumer: consumer);
 
                 await Task.Delay(1000, stoppingToken);
 
